@@ -1,0 +1,36 @@
+name: Build R9m Kernel
+on:
+  push:
+    branches: [ Lollipop-CHN ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: Lollipop-CHN
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make bc gcc lib32z1 wget patch
+      - name: Get aarch64 toolchain
+        run: |
+          git clone --depth=1 -b android-6.0.1_r32 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 toolchain
+      - name: Try Fix-HeaderPath patch
+        run: |
+          wget -q https://github.com/Dawn-Blossoms/android_kernel_oppo_mt6750/releases/download/Backup/Fix-HeaderPath-L.patch || true
+          if [ -f Fix-HeaderPath-L.patch ]; then patch -p1 < Fix-HeaderPath-L.patch || echo "patch failed, continue"; fi
+      - name: Build kernel
+        run: |
+          export ARCH=arm64
+          export CROSS_COMPILE=$PWD/toolchain/bin/aarch64-linux-android-
+          export Codename=oppo6755_15111
+          make ${Codename}_debug_defconfig
+          make -j$(nproc) 2>&1 | tee build.log
+      - name: Upload kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: r9m-kernel-Image.gz-dtb
+          path: arch/arm64/boot/Image.gz-dtb
